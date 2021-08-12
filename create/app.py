@@ -444,8 +444,9 @@ def show_create_post():
 # the search view
 @app.route('/artist/search',methods=['GET'])
 def search_artist():
-    search = request.form.get('search_term', '').strip()
-    artists = Artist.query.filter(Artist.name.ilike('%' + search + '%')).all()  
+    search = request.form.get('search', '').strip()
+    artists = Artist.query.filter(Artist.name.ilike('%'+search +'%')).all()  
+    # artists = Artist.query.filter_by(Artist.name.contains(search)).all()  
     
     print(artists)
     artist_list = []
@@ -463,11 +464,12 @@ def search_artist():
         "num_upcoming_shows": num_upcoming 
         })
 
-        response = {
-        "count": len(artists),
-        "data": artist_list
+    response = {
+    "count": len(artists),
+    "data": artist_list,
+    "search":search
     }
-    return render_template('search_artists.html', results=response, search_term=request.form.get('search_term', ''))
+    return render_template('search_artists.html', results=response, search_term=request.args.get('search', ''))
  
 
 # i have a whole lot features to add but time won't permit me , i want to ask if i can commit more work to this later ..thanks in anticipation waiting for your responce 
