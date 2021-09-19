@@ -1,6 +1,6 @@
 from os import error
 import babel
-from flask import render_template, request, Response, flash, redirect, url_for, abort, jsonify
+from flask import render_template, request, Response,session,flash, redirect, url_for, abort, jsonify
 from operator import itemgetter
 
 from wtforms.fields.core import DateTimeField
@@ -10,6 +10,94 @@ from create.model import Venue,Show,Artist
 import re
 import dateutil.parser
 from datetime import datetime,timedelta
+from functools import wraps
+import json
+from authlib.integrations.flask_client import OAuth
+from six.moves.urllib.parse import urlencode
+from create import app
+
+
+
+
+
+oauth = OAuth(app)
+
+auth0 = oauth.register(
+    'auth0',
+    client_id='9CgybQZswnK2uB1ubLWvM0PTZG7IvJtf',
+    client_secret='eUqY5P1gZh9JGMDo3RyZ6qr5jSlQ8BAjz9TVPGAN9UhWNlCgbQ7uqptuPi925fhQ',
+    api_base_url='https://dev-i3u0jqpm.us.auth0.com',
+    access_token_url='https://dev-i3u0jqpm.us.auth0.com/oauth/token',
+    authorize_url='https://dev-i3u0jqpm.us.auth0.com/authorize',
+    client_kwargs={
+        'scope': 'openid profile email',
+    },
+)
+
+@app.route('/callback')
+def callback_handling():
+    # Handles response from token endpoint
+    auth0.authorize_access_token()
+    resp = auth0.get('userinfo')
+    userinfo = resp.json()
+
+    # Store the user information in flask session.
+    session['jwt_payload'] = userinfo
+    session['profile'] = {
+        'user_id': userinfo['sub'],
+        'name': userinfo['name'],
+        'picture': userinfo['picture']
+    }
+    return redirect('/dashboard')
+
+
+@app.route('/login')
+def login():
+    return auth0.authorize_redirect(redirect_uri='https://127.0.0.1:8000/')
+
+def requires_auth(f):
+  @wraps(f)
+  def decorated(*args, **kwargs):
+    if 'profile' not in session:
+      # Redirect to Login page here
+      return redirect('/')
+    return f(*args, **kwargs)
+
+  return decorated
+
+# /server.py
+
+@app.route('/dashboard')
+@requires_auth
+def dashboard():
+    return render_template('dashboard.html',
+                           userinfo=session['profile'],
+                           userinfo_pretty=json.dumps(session['jwt_payload'], indent=4))
+
+
+@app.route('/logon')
+def logon():
+    return render_template('oauth.html')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # i used this third party code to format the date and time
@@ -130,6 +218,7 @@ def show_venue(venue_id):
                     "artist_id": show.artist_id,
                     "artist_name": show.artist.name,
                     "artist_image_link": show.artist.image_link,
+                    'phone':show.artist.phone,
                     "start_time": format_datetime(str(show.start_time))
                 })
             if show.start_time < now:
@@ -138,6 +227,8 @@ def show_venue(venue_id):
                     "artist_id": show.artist_id,
                     "artist_name": show.artist.name,
                     "artist_image_link": show.artist.image_link,
+                    'phone':show.artist.phone,
+
                     "start_time": format_datetime(str(show.start_time))
                 })
 
@@ -148,7 +239,7 @@ def show_venue(venue_id):
             "address": venue.address,
             "city": venue.city,
             "state": venue.state,
-            # "phone": (venue.phone[:3] + '-' + venue.phone[3:6] + '-' + venue.phone[6:]),
+            'phone':venue.phone,
             "website": venue.website,
             "facebook_link": venue.facebook_link,
             "seeking_talent": venue.seeking_talent,
@@ -238,10 +329,10 @@ def artists_create():
                 name=form.name.data,
                 city=form.city.data,
                 state=form.state.data,
-                phone=form.state.data,
+                phone=form.phone.data,
                 genres=form.genres.data,
                 image_link=form.image_link.data,
-                facebook_link=form.genres.data,
+                facebook_link=form.facebook_link.data,
                 website=form.website.data,
                 seeking_description=form.seeking_description.data
                 )
@@ -276,6 +367,7 @@ def artist_details(artist_id):
                 'venue_id':show.venue_id,
                 'venue_name':show.venue.name,
                 'venue_image_link':show.venue.image_link,
+                'phone':show.venue.phone,
                 'start_time':format_datetime(str(show.start_time))
             })
         if show.start_time < now:
@@ -284,6 +376,7 @@ def artist_details(artist_id):
                 'venue_id':show.venue_id,
                 'venue_name':show.venue.name,
                 'venue_image_link':show.venue.image_link,
+                'phone':show.venue.phone,
                 'start_time':format_datetime(str(show.start_time))
             })
     data= {
@@ -292,7 +385,7 @@ def artist_details(artist_id):
         "genres": artist.genres,
         "city": artist.city,
         "state": artist.state,
-        "phone": (artist.phone[:3] + '-' + artist.phone[3:6] + '-' + artist.phone[6:]),
+        'phone':artist.phone,
         "website": artist.website,
         "facebook_link": artist.facebook_link,
         "seeking_venue": artist.seeking_venue,
@@ -303,6 +396,12 @@ def artist_details(artist_id):
         "upcoming_shows": upcoming_shows,
         "upcoming_shows_count": upcoming_shows_count
         }
+    
+    
+   
+        
+
+        
 
     return render_template('show_artist.html',artist=data)
 
@@ -445,8 +544,9 @@ def show_create_post():
 @app.route('/artist/search',methods=['GET'])
 def search_artist():
     search = request.form.get('search', '').strip()
-    artists = Artist.query.filter(Artist.name.ilike('%'+search +'%')).all()  
-    # artists = Artist.query.filter_by(Artist.name.contains(search)).all()  
+    artists = Artist.query.filter(Artist.name.contains('%'+search +'%'),Artist.name.ilike("%" + search + "%")).all()  
+    venues = Venue.query.filter(Venue.name.contains('%'+search +'%'),Venue.name.ilike("%" + search + "%")).all()  
+    # artists = Artist.query.filter_by(Artist.name.contains(search))()  
     
     print(artists)
     artist_list = []
@@ -463,11 +563,21 @@ def search_artist():
         "name": artist.name,
         "num_upcoming_shows": num_upcoming 
         })
+    for venue in venues:
+        venue_shows=Show.query.filter(venue_id=venue.id).all()
+        num_upcoming=0
+        for show in venue_shows:
+            if show.start_time > now:
+                num_upcoming += 1
+ 
+        
+
 
     response = {
     "count": len(artists),
     "data": artist_list,
-    "search":search
+    "search":search,
+    
     }
     return render_template('search_artists.html', results=response, search_term=request.args.get('search', ''))
  
