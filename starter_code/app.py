@@ -4,21 +4,20 @@ from flask import render_template, request, Response,session,flash, redirect, ur
 from operator import itemgetter
 
 from wtforms.fields.core import DateTimeField
-from create import app,db
-from create.forms import VenueForm,ArtistForm,ShowForm
-from create.model import Venue,Show,Artist
+from starter_code import app,db
+from starter_code.forms import VenueForm,ArtistForm,ShowForm
+from starter_code.model import Venue,Show,Artist
 import re
 import dateutil.parser
 from datetime import datetime,timedelta
 from functools import wraps
 import json
 from authlib.integrations.flask_client import OAuth
-from six.moves.urllib.parse import urlencode
-from create import app
+# from six.moves.urllib.parse import urlencode
 
 
 
-
+# optional
 
 oauth = OAuth(app)
 
@@ -82,7 +81,7 @@ def logon():
 
 
 
-
+# end of optional
 
 
 

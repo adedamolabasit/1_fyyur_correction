@@ -14,4 +14,4 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 
-from create import app
+from starter_code import app

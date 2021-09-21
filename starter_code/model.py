@@ -1,6 +1,5 @@
-from create import app
+from starter_code import app,db
 from datetime import datetime
-from create import db
 
 
 
