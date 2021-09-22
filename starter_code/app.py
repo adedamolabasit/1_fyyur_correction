@@ -4,7 +4,7 @@ from flask import render_template, request, Response,session,flash, redirect, ur
 from operator import itemgetter
 
 from wtforms.fields.core import DateTimeField
-from starter_code import app,db
+# from starter_code import app,db
 from starter_code.forms import VenueForm,ArtistForm,ShowForm
 from starter_code.model import Venue,Show,Artist
 import re
@@ -13,11 +13,12 @@ from datetime import datetime,timedelta
 from functools import wraps
 import json
 from authlib.integrations.flask_client import OAuth
-# from six.moves.urllib.parse import urlencode
+from six.moves.urllib.parse import urlencode
+from starter_code import app,db
 
 
 
-# optional
+
 
 oauth = OAuth(app)
 
@@ -81,7 +82,7 @@ def logon():
 
 
 
-# end of optional
+
 
 
 
@@ -205,31 +206,30 @@ def show_venue(venue_id):
         genres = [ genre.name for genre in venue.genres ]
         
         # Get a list of shows and count the ones in the past and future
-        past_shows = []
+        past_show = []
         past_shows_count = 0
-        upcoming_shows = []
+        upcoming_show = []
         upcoming_shows_count = 0
         now = datetime.now()
-        for show in venue.shows:
-            if show.start_time > now:
-                upcoming_shows_count += 1
-                upcoming_shows.append({
-                    "artist_id": show.artist_id,
-                    "artist_name": show.artist.name,
-                    "artist_image_link": show.artist.image_link,
-                    'phone':show.artist.phone,
-                    "start_time": format_datetime(str(show.start_time))
-                })
-            if show.start_time < now:
-                past_shows_count += 1
-                past_shows.append({
-                    "artist_id": show.artist_id,
-                    "artist_name": show.artist.name,
-                    "artist_image_link": show.artist.image_link,
-                    'phone':show.artist.phone,
-
-                    "start_time": format_datetime(str(show.start_time))
-                })
+        show=Show.query.all()
+    
+        past_shows = db.session.query(Show).join(Venue).filter(Show.artist_id==venue_id).filter(Show.start_time < now).all()
+        for show in past_shows:
+            past_show.append({
+            "artist_id": show.artist_id,
+            "artist_name": show.artist.name,
+            "artist_image_link": show.artist.image_link,
+            'phone':show.artist.phone,
+            "start_time": format_datetime(str(show.start_time))})
+        
+        upcoming_shows = db.session.query(Show).join(Venue).filter(Show.artist_id==venue_id).filter(Show.start_time > now).all()
+        for show in upcoming_shows:
+            upcoming_show.append({
+            "artist_id": show.artist_id,
+            "artist_name": show.artist.name,
+            "artist_image_link": show.artist.image_link,
+            'phone':show.artist.phone,
+            "start_time": format_datetime(str(show.start_time))})
 
         data = {
             "id": venue_id,
@@ -244,9 +244,9 @@ def show_venue(venue_id):
             "seeking_talent": venue.seeking_talent,
             "seeking_description": venue.seeking_description,
             "image_link": venue.image_link,
-            "past_shows": past_shows,
+            "past_shows": past_show,
             "past_shows_count": past_shows_count,
-            "upcoming_shows": upcoming_shows,
+            "upcoming_shows": upcoming_show,
             "upcoming_shows_count": upcoming_shows_count
         }
     return render_template('venue_details.html',venue=data)
